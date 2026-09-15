@@ -23,28 +23,33 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Mendukung unggah source code langsung maupun upload file ZIP utuh
+      # Mendeteksi dan mengekstrak jika Anda mengunggah file ZIP utuh
       - name: Extract ZIP if uploaded directly as archive
         run: |
-          ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
+          ZIP_FILE=$(find . -maxdepth 2 -name "*.zip" | head -n 1)
           if [ -n "$ZIP_FILE" ]; then
-            echo "Ditemukan arsip ZIP: $ZIP_FILE. Mengekstrak..."
-            unzip -o "$ZIP_FILE" -d .
-            rm "$ZIP_FILE"
-          else
-            echo "Tidak ada file ZIP di root; menggunakan file repositori secara langsung."
+            echo "Found ZIP archive: $ZIP_FILE. Extracting..."
+            unzip -o "$ZIP_FILE" -d ./extracted_zip
+            if [ -f "./extracted_zip/package.json" ]; then
+              cp -rf ./extracted_zip/* .
+            else
+              SUBDIR=$(find ./extracted_zip -maxdepth 2 -name "package.json" -exec dirname {} \;)
+              if [ -n "$SUBDIR" ]; then
+                cp -rf "$SUBDIR"/* .
+              fi
+            fi
+            rm -rf "$ZIP_FILE" ./extracted_zip
           fi
 
+      # Setup Node.js tanpa 'cache: npm' agar tidak menuntut package-lock.json
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install
+        run: npm install --no-audit --no-fund
 
-      # Mengompilasi aplikasi dengan kredensial Supabase yang disuntikkan secara otomatis
       - name: Build Application with Supabase Integration
         run: npm run build
         env:
